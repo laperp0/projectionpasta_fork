@@ -2,6 +2,10 @@ from PIL import Image
 import numpy as np
 import os
 import math as ma
+import scipy
+
+import projections_but_new.petroff_quincuncial as pq
+import projections_but_new.collignon_quincuncial as cq
 
 #Increases potential map size to 1 million x 1 million pixels, which is probably more than anyone's RAM could actually handle
 Image.MAX_IMAGE_PIXELS = 1e12
@@ -107,7 +111,7 @@ def Hem_pos(lon,lat,hem,ex,f,s):
 def Def_vis(x,y,ex):
     return True
 def Edge_vis(x,lat,f):
-    xmax, y1 = f(ma.pi,np.where(np.abs(lat)>ma.pi/2,ma.pi/2,lat),ex)
+    xmax, y1 = f(ma.pi,np.where(np.abs(lat)>ma.pi/2,ma.pi/2,lat),x) # OOpsy. If changed, original was ex.
     return np.where(np.abs(x) > xmax, False, True)
 def Circ_vis(x,y,ex):
     return np.where(np.sqrt(x**2 + y**2) > 1, False, True)
@@ -509,6 +513,53 @@ Mill_typ = Def_typ
 Mill_rat = ma.pi/(5/4*ma.asinh(ma.tan(ma.pi*2/5)))
 Mill_int = Rect_int
 
+################################# Equatorial Collignon Quincuncial Projection
+
+#Remapping functions for each projection:
+#coords determines (lon,lat) coordinates for a given (x,y) position on the map
+#pos determines (x,y) position for given (lon,lat) coordinates
+#vis determines if an (x,y) position on the output should be shown on non-rectangular maps
+#pres determines if an (x,y) position is present on the input
+#typ incorporates extra information required for specific projection types
+#rat is the map width/height ratio
+#int determines type of interpolation
+#x and y have ranges of (-1, 1)
+#lon is (-pi,pi) or (-pi/2, pi/2) as appropriate
+#lat is (-pi/2, pi/2)
+#with (0,0) at the map center
+
+
+def Coll_coords(x, y, ex):
+    long, lat = cq.collignon_quincuncial_inverse(x, y)
+    return long, lat
+
+
+def Coll_pos(phi, lambda_, ex):
+    x_t, y_t = cq.collignon_quincuncial(phi, lambda_)
+    return x_t, y_t
+
+Coll_vis = Def_vis
+Coll_pres = Def_pres
+Coll_rat = 1
+Coll_typ = Def_typ
+Coll_int = Def_int
+
+
+def Petrov_coords(x, y, ex):
+    lon, lat = pq.new_projection_inverse(x, y)
+    return lon, lat
+
+def Petrov_pos(lon,lat,ex):
+    x, y = pq.new_projection(lon-np.pi, lat)
+    return x, y
+
+
+Petrov_vis = Def_vis
+Petrov_pres = Def_pres
+Petrov_rat = 1
+Petrov_typ = Def_typ
+Petrov_int = Def_int
+
 #List of all currently implemented projections; finding their index in this list will give you the proper index to use for running the functions
 proj_list = [
     'Equirectangular',
@@ -528,7 +579,9 @@ proj_list = [
     'Lambert Azimuthal',
     'Mercator',
     'Gall Stereographic',
-    'Miller Cylindrical'
+    'Miller Cylindrical',
+    'Equatorial Collignon Quincuncial'
+    'Petrov Equal-Area Quincuncial'
     ]
     
 
@@ -552,7 +605,9 @@ coordsl = [
     Lamb_coords,
     Merc_coords,
     Gallst_coords,
-    Mill_coords
+    Mill_coords,
+    Coll_coords,
+    Petrov_coords
     ]
 
 posl = [
@@ -573,7 +628,9 @@ posl = [
     Lamb_pos,
     Merc_pos,
     Gallst_pos,
-    Mill_pos
+    Mill_pos,
+    Coll_pos,
+    Petrov_pos
     ]
 
 visl = [
@@ -594,7 +651,9 @@ visl = [
     Lamb_vis,
     Merc_vis,
     Gallst_vis,
-    Mill_vis
+    Mill_vis,
+    Coll_vis,
+    Petrov_vis
     ]
 
 presl = [
@@ -615,7 +674,9 @@ presl = [
     Lamb_pres,
     Merc_pres,
     Gallst_pres,
-    Mill_pres
+    Mill_pres,
+    Coll_pres,
+    Petrov_pres
     ]
 
 ratl = [
@@ -636,7 +697,9 @@ ratl = [
     Lamb_rat,
     Merc_rat,
     Gallst_rat,
-    Mill_rat
+    Mill_rat,
+    Coll_rat,
+    Petrov_rat
     ]
 
 typl = [
@@ -657,7 +720,9 @@ typl = [
     Lamb_typ,
     Merc_typ,
     Gallst_typ,
-    Mill_typ
+    Mill_typ,
+    Coll_typ,
+    Petrov_typ
     ]
 
 intl = [
@@ -678,7 +743,9 @@ intl = [
     Lamb_int,
     Merc_int,
     Gallst_int,
-    Mill_int
+    Mill_int,
+    Coll_int,
+    Petrov_int
     ]
 
 #Rotates from one aspect to another; written almost exclusively by Amadea de Silva
@@ -922,11 +989,7 @@ def Main(file_in, file_out, proj_in=0, proj_out=0, lon_in=0, lat_in=0, rot_in=0,
     map_out.save(file_out)
     print("Finished; saved to "+file_out)
             
-#Runs the main function but directly takes angle inputs in degrees      
-def MainDeg(file_in, file_out, proj_in=0, proj_out=0, lon_in=0, lat_in=0, rot_in=0, lon_out=0, lat_out=0, rot_out=0,
-         tol=1e-6, imax=20, hem_in=0, hem_out=0, trim=0, trunc=False, interp=0, aviter = False):
-    Main(file_in, file_out, proj_in, proj_out, ma.radians(lon_in), ma.radians(lat_in), ma.radians(rot_in), ma.radians(lon_out), ma.radians(lat_out), ma.radians(rot_out),
-         tol, imax, hem_in, hem_out, trim, trunc, interp, aviter)
+
 
 #Input    
 
@@ -968,14 +1031,24 @@ Projection Options and Codes (with profile):
  15: Mercator truncated to square (1:1 square)
  16: Gall Stereographic (1.301:1 rectangle)
  17: Miller Cylindrical (1.364:1 rectangle)
+ 18: Collignon Quincuncial (1:1 square)
+ 19: Petrov Equal-Area Quincuncial (1:1 square)
 
 ''')
     print("Input Image")
-    while True:
-        file_in = input(" Filename: ")
-        if os.path.exists(file_in):
-            break
+
+    ### Jessica's first mod: setting hard input and output folders.
+ 
+    folder_in = os.path.dirname(os.path.abspath(__file__))
+    folder_in = os.path.join(folder_in, "input")
+    dir_in = os.listdir(folder_in)
+    title_in = dir_in[0].strip()
+    file_in = os.path.join(folder_in, title_in)
+
+    if not(os.path.exists(file_in)):
         print("  No file found at "+str(file_in))
+        quit()
+    print("File located at: \n "+str(file_in)+ "\n If this is not the desired file, check to see if there are other files in the input folder. \n")
     proj_in = Inprompt(" Projection: ",int,True)
     if typl[proj_in] == Hemfull_typ:
         hem_in = Inprompt("  0 for global, 1 for hemisphere, 2 for bihemisphere: ",int)
@@ -987,7 +1060,14 @@ Projection Options and Codes (with profile):
 
     print("""
 Output Image""")
-    file_out = input(" Filename: ")
+    
+    folder_out = os.path.dirname(os.path.abspath(__file__))
+    folder_out = os.path.join(folder_out, "output")
+    title_out = f"{os.path.splitext(title_in)[0]}_output{os.path.splitext(title_in)[1]}"    
+
+    file_out = os.path.join(folder_out, title_out) ############### Jessica's first mod: setting hard input and output folders.
+    #f = Image.open(file_out)
+    
     proj_out = Inprompt(" Projection: ",int,True)
     if typl[proj_out] == Hemfull_typ:
         hem_out = Inprompt("  0 for global, 1 for hemisphere, 2 for bihemisphere: ",int)
