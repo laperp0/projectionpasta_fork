@@ -1,3 +1,4 @@
 projectionpasta_fork.code-workspace
 projections_but_new/__init__.py
 projections_but_new/__pycache__
+.venv
